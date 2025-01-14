@@ -23,8 +23,18 @@ import {
   AppBar,
   Toolbar,
   IconButton,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
 } from "@mui/material";
-import { Add, Edit, Email, Payment, Menu as MenuIcon } from "@mui/icons-material";
+import {
+  Add,
+  Edit,
+  Email,
+  Payment,
+  Menu as MenuIcon,
+} from "@mui/icons-material";
 import { LocalizationProvider, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
@@ -110,6 +120,9 @@ const App = () => {
   const [users, setUsers] = useState([]);
   const [plans, setPlans] = useState([]);
   const [paidUsers, setPaidUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [message, setMessage] = useState("");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
@@ -160,6 +173,35 @@ const App = () => {
       startDate: dayjs("2025-01-01"),
     });
     fetchUsers();
+  };
+  const handleEdit = (user) => {
+    setSelectedUser(user);
+    setEditDialogOpen(true);
+  };
+
+  // Save edited user
+  const saveEdit = async () => {
+    try {
+      const { id, ...updatedUser } = selectedUser;
+      await axios.put(`${backendUrl}/users/${id}`, updatedUser);
+      setMessage("User updated successfully!");
+      setEditDialogOpen(false);
+      fetchUsers();
+    } catch (error) {
+      console.error("Error updating user:", error);
+      setMessage("Error updating user.");
+    }
+  };
+
+  // Send email notification
+  const sendEmailNotification = async (user) => {
+    try {
+      await axios.post(`${backendUrl}/send-reminders`, { userId: user.id });
+      setMessage(`Email sent to ${user.name}`);
+    } catch (error) {
+      console.error("Error sending email:", error);
+      setMessage("Error sending email.");
+    }
   };
 
   return (
@@ -258,7 +300,9 @@ const App = () => {
                     onChange={(newValue) =>
                       setNewUser({ ...newUser, startDate: newValue })
                     }
-                    renderInput={(params) => <TextField {...params} fullWidth />}
+                    renderInput={(params) => (
+                      <TextField {...params} fullWidth />
+                    )}
                   />
                 </LocalizationProvider>
               </Grid>
@@ -303,18 +347,96 @@ const App = () => {
                         {new Date(user.startDate).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <Button>
+                        <IconButton
+                          color="secondary"
+                          onClick={() => handleEdit(user)}
+                        >
                           <Edit />
-                        </Button>
-                        <Button>
+                        </IconButton>
+                        <IconButton
+                          color="primary"
+                          onClick={() => sendEmailNotification(user)}
+                        >
                           <Email />
-                        </Button>
+                        </IconButton>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </TableContainer>
+            {/* Edit User Dialog */}
+            <Dialog
+              open={editDialogOpen}
+              onClose={() => setEditDialogOpen(false)}
+            >
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogContent>
+                <TextField
+                  label="Name"
+                  value={selectedUser?.name || ""}
+                  onChange={(e) =>
+                    setSelectedUser({ ...selectedUser, name: e.target.value })
+                  }
+                  margin="normal"
+                  fullWidth
+                />
+                <TextField
+                  label="Email"
+                  value={selectedUser?.email || ""}
+                  onChange={(e) =>
+                    setSelectedUser({ ...selectedUser, email: e.target.value })
+                  }
+                  margin="normal"
+                  fullWidth
+                />
+                <TextField
+                  label="Phone"
+                  value={selectedUser?.phone || ""}
+                  onChange={(e) =>
+                    setSelectedUser({ ...selectedUser, phone: e.target.value })
+                  }
+                  margin="normal"
+                  fullWidth
+                />
+                <FormControl fullWidth>
+                  <InputLabel>Plan</InputLabel>
+                  <Select
+                    value={selectedUser?.planId}
+                    onChange={(e) =>
+                      setSelectedUser({
+                        ...selectedUser,
+                        planId: e.target.value,
+                      })
+                    }
+                  >
+                    {plans.map((plan) => (
+                      <MenuItem key={plan.id} value={plan.id}>
+                        {plan.plan}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={saveEdit} variant="contained">
+                  Save
+                </Button>
+                <Button
+                  onClick={() => setEditDialogOpen(false)}
+                  variant="outlined"
+                >
+                  Cancel
+                </Button>
+              </DialogActions>
+            </Dialog>
+
+            {/* Message Section */}
+            {message && (
+              <Typography style={{ marginTop: "20px", color: "green" }}>
+                {message}
+              </Typography>
+            )}
           </TabPanel>
 
           {/* Make Payment Tab */}
@@ -326,7 +448,10 @@ const App = () => {
                   label="Email"
                   value={paymentDetails.email}
                   onChange={(e) =>
-                    setPaymentDetails({ ...paymentDetails, email: e.target.value })
+                    setPaymentDetails({
+                      ...paymentDetails,
+                      email: e.target.value,
+                    })
                   }
                   fullWidth
                 />
@@ -337,7 +462,10 @@ const App = () => {
                   type="number"
                   value={paymentDetails.amount}
                   onChange={(e) =>
-                    setPaymentDetails({ ...paymentDetails, amount: e.target.value })
+                    setPaymentDetails({
+                      ...paymentDetails,
+                      amount: e.target.value,
+                    })
                   }
                   fullWidth
                 />

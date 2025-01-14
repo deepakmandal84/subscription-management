@@ -5,6 +5,7 @@ const { Sequelize, DataTypes } = require('sequelize');
 const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
+require('dotenv').config();
 
 const app = express();
 const stripe = new Stripe('sk_test_51QeApeKQyYQHPnZvvRztUZzmCvEu7V8eLiE3lT5Y2ye64clK9j1bhxFD3JVFgpXqk2U2ndvhUGseK9kO7CpxoXtJ00gFmJFRWG'); // Replace with your Stripe secret key
@@ -73,14 +74,7 @@ const initializePlans = async () => {
     }
 };
 
-// Email Setup
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER, // Your email address
-        pass: process.env.EMAIL_PASS  // Your email password or app password
-    }
-});
+
 
 const sendPaymentFailureEmail = (user, amount) => {
     const mailOptions = {
@@ -103,20 +97,33 @@ Subscription Management Team`
         }
     });
 };
+// Email Setup
+const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: "sbscrptndmn@gmail.com",
+      pass: "ljkg ihxa dvkr xwle"
+    }
+  });
 
-const sendPaymentReminderEmail = (user, subscription) => {
+const sendPaymentReminderEmail = (user) => {
+    console.log('EMAIL_USER:', process.env.EMAIL_USER);    
+    console.log('EMAIL_PASS:', process.env.EMAIL_PASS);
+
     const mailOptions = {
         from: process.env.EMAIL_USER,
         to: user.email,
         subject: 'Payment Reminder Notification',
         text: `Dear ${user.name},
 
-This is a friendly reminder that your payment for the subscription plan "${subscription.plan}" is due soon. Please ensure your payment is completed to avoid any interruptions to your services.
+This is a friendly reminder that your payment for the subscription plan "${user.SubscriptionPlan?.plan}" is due soon. Please ensure your payment is completed to avoid any interruptions to your services.
 
 Best regards,
 Subscription Management Team`
     };
-
+    console.log(mailOptions);
     transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
             console.error('Error sending reminder email:', error);
@@ -298,8 +305,21 @@ app.post('/payments', async (req, res) => {
     }
 });
 
-
 app.post('/send-reminders', async (req, res) => {
+    try {
+        console.log(req.body.userId);
+        const {userId} = req.body;
+        const user = await User.findByPk(userId);
+        
+        sendPaymentReminderEmail(user);
+        res.status(200).json({ message: 'Payment reminders sent.' });
+    } catch (error) {
+        console.error('Error sending reminders:', error);
+        res.status(500).json({ error: 'Failed to send reminders.' });
+    }
+});
+
+app.post('/send-reminder-job', async (req, res) => {
     try {
         const subscriptions = await SubscriptionPlan.findAll({
             where: { active: true },
